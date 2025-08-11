@@ -1,10 +1,15 @@
 local player = game.Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoid = character:FindFirstChildOfClass("Humanoid")
 
--- Criando a ScreenGui
+-- Variáveis globais para manter config mesmo após morrer
+_G.flingActive = _G.flingActive or false
+_G.savedSpeed = _G.savedSpeed or 16
+
+-- Criando a ScreenGui no CoreGui (não some no respawn)
 local screenGui = Instance.new("ScreenGui")
-screenGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+screenGui.IgnoreGuiInset = false
+screenGui.ResetOnSpawn = false
+screenGui.Name = "TouchFlingGui"
+screenGui.Parent = game:GetService("CoreGui")
 
 -- Criando a Frame
 local frame = Instance.new("Frame")
@@ -12,19 +17,19 @@ frame.Size = UDim2.new(0, 200, 0, 200)
 frame.Position = UDim2.new(0.5, -100, 0.5, -100)
 frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 frame.Active = true
-frame.Draggable = true -- Permite arrastar
+frame.Draggable = true
 frame.Parent = screenGui
 
--- Criando a TextBox para inserir a velocidade
+-- Criando a TextBox
 local speedInput = Instance.new("TextBox")
 speedInput.Size = UDim2.new(0, 180, 0, 50)
 speedInput.Position = UDim2.new(0, 10, 0, 20)
 speedInput.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-speedInput.Text = "Digite a Velocidade"
+speedInput.Text = tostring(_G.savedSpeed)
 speedInput.ClearTextOnFocus = true
 speedInput.Parent = frame
 
--- Criando o botão de confirmar da velocidade
+-- Botão de confirmar velocidade
 local confirmButton = Instance.new("TextButton")
 confirmButton.Size = UDim2.new(0, 180, 0, 50)
 confirmButton.Position = UDim2.new(0, 10, 0, 80)
@@ -32,75 +37,87 @@ confirmButton.BackgroundColor3 = Color3.fromRGB(100, 255, 100)
 confirmButton.Text = "Confirmar Velocidade"
 confirmButton.Parent = frame
 
--- Criando o botão de Fling
+-- Botão de Fling
 local flingButton = Instance.new("TextButton")
 flingButton.Size = UDim2.new(0, 180, 0, 50)
 flingButton.Position = UDim2.new(0, 10, 0, 140)
 flingButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-flingButton.Text = "Fling OFF"
+flingButton.Text = _G.flingActive and "Fling ON" or "Fling OFF"
 flingButton.TextColor3 = Color3.fromRGB(0, 0, 0)
-flingButton.TextSize = 20.000
+flingButton.TextSize = 20
 flingButton.Parent = frame
 
--- Variáveis para Fling
-local flingActive = false
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local flingThread
 
 if not ReplicatedStorage:FindFirstChild("juisdfj0i32i0eidsuf0iok") then
-    local detection = Instance.new("Decal")
-    detection.Name = "juisdfj0i32i0eidsuf0iok"
-    detection.Parent = ReplicatedStorage
+	local detection = Instance.new("Decal")
+	detection.Name = "juisdfj0i32i0eidsuf0iok"
+	detection.Parent = ReplicatedStorage
 end
 
 local function fling()
-    local lp = Players.LocalPlayer
-    local c, hrp, vel, movel = nil, nil, nil, 0.1
-
-    while flingActive do
-        RunService.Heartbeat:Wait()
-        c = lp.Character
-        hrp = c and c:FindFirstChild("HumanoidRootPart")
-
-        if hrp then
-            vel = hrp.Velocity
-            hrp.Velocity = vel * 10000 + Vector3.new(0, 10000, 0)
-            RunService.RenderStepped:Wait()
-            hrp.Velocity = vel
-            RunService.Stepped:Wait()
-            hrp.Velocity = vel + Vector3.new(0, movel, 0)
-            movel = -movel
-        end
-    end
+	local lp = Players.LocalPlayer
+	local c, hrp, vel, movel = nil, nil, nil, 0.1
+	while _G.flingActive do
+		RunService.Heartbeat:Wait()
+		c = lp.Character
+		hrp = c and c:FindFirstChild("HumanoidRootPart")
+		if hrp then
+			vel = hrp.Velocity
+			hrp.Velocity = vel * 10000 + Vector3.new(0, 10000, 0)
+			RunService.RenderStepped:Wait()
+			hrp.Velocity = vel
+			RunService.Stepped:Wait()
+			hrp.Velocity = vel + Vector3.new(0, movel, 0)
+			movel = -movel
+		end
+	end
 end
 
+-- Toggle fling
 flingButton.MouseButton1Click:Connect(function()
-    flingActive = not flingActive
-    flingButton.Text = flingActive and "Fling ON" or "Fling OFF"
-    if flingActive then
-        flingThread = coroutine.create(fling)
-        coroutine.resume(flingThread)
-    else
-        flingActive = false
-    end
+	_G.flingActive = not _G.flingActive
+	flingButton.Text = _G.flingActive and "Fling ON" or "Fling OFF"
+	if _G.flingActive then
+		flingThread = coroutine.create(fling)
+		coroutine.resume(flingThread)
+	end
 end)
 
--- Função para confirmar a velocidade digitada
+-- Confirmar velocidade
 confirmButton.MouseButton1Click:Connect(function()
-    local speed = tonumber(speedInput.Text) -- Converte o texto para número
-    if speed and speed > 0 then
-        humanoid.WalkSpeed = speed
-    else
-        speedInput.Text = "Valor Inválido"
-    end
+	local speed = tonumber(speedInput.Text)
+	if speed and speed > 0 then
+		_G.savedSpeed = speed
+		if player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+			player.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = speed
+		end
+	else
+		speedInput.Text = "Valor Inválido"
+	end
 end)
 
--- Exibindo a notificação ao executar o script
+-- DESATIVA o fling automaticamente quando o personagem morre/reset
+player.CharacterRemoving:Connect(function()
+	_G.flingActive = false
+	flingButton.Text = "Fling OFF"
+end)
+
+-- Reaplicar configs sempre que respawnar
+player.CharacterAdded:Connect(function(char)
+	local humanoid = char:WaitForChild("Humanoid")
+	humanoid.WalkSpeed = _G.savedSpeed
+	-- O fling NÃO será ligado automaticamente após o respawn
+	-- Você precisa ativar manualmente pelo botão se quiser ligar
+end)
+
+-- Notificação
 game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title = "Touch Fling V2",
-    Text = "Script Made by Tlz_Leo @Leozingamekkj",
-    Icon = "rbxassetid://123456789",  -- Você pode adicionar um ícone aqui, se quiser (se tiver o ID do ícone)
-    Duration = 5  -- A notificação vai desaparecer após 5 segundos
+	Title = "Touch Fling V2",
+	Text = "Script Made by Tlz_Leo @Leozingamekkj",
+	Icon = "rbxassetid://6023426925",
+	Duration = 5
 })
